@@ -1,22 +1,12 @@
-import sqlite3
+from database.connection import Connection
 
 class Magazine:
-    def __init__(self, id, name, category):
+    def __init__(self, id, name):
         if not isinstance(name, str) or not (2 <= len(name) <= 16):
-            raise ValueError("Name must be a string between 2 and 16 characters")
-        if not isinstance(category, str) or len(category) == 0:
-            raise ValueError("Category must be a non-empty string")
-
-        self._id = id
+            raise ValueError("Name must be a string between 2 and 16 characters.")
+        
+        self._id = id  
         self._name = name
-        self._category = category
-
-        connection = sqlite3.connect('database.db')
-        cursor = connection.cursor()
-        cursor.execute("INSERT INTO magazines (id, name, category) VALUES (?, ?, ?)", 
-                       (self._id, self._name, self._category))
-        connection.commit()
-        connection.close()
 
     @property
     def id(self):
@@ -26,50 +16,36 @@ class Magazine:
     def name(self):
         return self._name
 
-    @property
-    def category(self):
-        return self._category
-
+    @name.setter
+    def name(self, value):
+        if not isinstance(value, str) or not (2 <= len(value) <= 16):
+            raise ValueError("Name must be a string between 2 and 16 characters.")
+        self._name = value
     def articles(self):
-        connection = sqlite3.connect('database.db')
-        cursor = connection.cursor()
-        cursor.execute("SELECT * FROM articles WHERE magazine_id = ?", (self.id,))
-        articles = cursor.fetchall()
-        connection.close()
-        return articles
+        query = "SELECT * FROM articles WHERE magazine_id = ?;"
+        return Connection.get_db_connection().execute(query, (self.id,)).fetchall()
 
     def contributors(self):
-        connection = sqlite3.connect('database.db')
-        cursor = connection.cursor()
-        cursor.execute("""
-            SELECT DISTINCT a.id, a.name
-            FROM authors a
-            JOIN articles ar ON ar.author_id = a.id
-            WHERE ar.magazine_id = ?
-        """, (self.id,))
-        contributors = cursor.fetchall()
-        connection.close()
-        return contributors
+        query = """
+            SELECT DISTINCT authors.* 
+            FROM authors 
+            JOIN articles ON authors.id = articles.author_id
+            WHERE articles.magazine_id = ?;
+        """
+        return Connection.get_db_connection().execute(query, (self.id,)).fetchall()
 
     def article_titles(self):
-        connection = sqlite3.connect('database.db')
-        cursor = connection.cursor()
-        cursor.execute("SELECT title FROM articles WHERE magazine_id = ?", (self.id,))
-        titles = [row[0] for row in cursor.fetchall()]
-        connection.close()
-        return titles if titles else None
+        query = "SELECT title FROM articles WHERE magazine_id = ?;"
+        titles = Connection.get_db_connection().execute(query, (self.id,)).fetchall()
+        return [title[0] for title in titles] if titles else None
 
     def contributing_authors(self):
-        connection = sqlite3.connect('database.db')
-        cursor = connection.cursor()
-        cursor.execute("""
-            SELECT a.id, a.name, COUNT(*) as article_count
-            FROM authors a
-            JOIN articles ar ON ar.author_id = a.id
-            WHERE ar.magazine_id = ?
-            GROUP BY a.id
-            HAVING article_count > 2
-        """, (self.id,))
-        authors = cursor.fetchall()
-        connection.close()
-        return authors if authors else None
+        query = """
+            SELECT authors.*, COUNT(articles.id) AS article_count 
+            FROM authors
+            JOIN articles ON authors.id = articles.author_id
+            WHERE articles.magazine_id = ?
+            GROUP BY authors.id
+            HAVING article_count > 2;
+        """
+        return Connection.get_db_connection().execute(query, (self.id,)).fetchall()

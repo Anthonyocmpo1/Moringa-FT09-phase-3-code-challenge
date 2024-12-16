@@ -1,18 +1,14 @@
-import sqlite3
+from database.connection import Connection
 
 class Author:
     def __init__(self, id, name):
+        if not isinstance(id, int):
+            raise ValueError("ID must be an integer.")
         if not isinstance(name, str) or len(name) == 0:
-            raise ValueError("Name must be a non-empty string")
-
+            raise ValueError("Name must be a non-empty string.")
+        
         self._id = id
         self._name = name
-
-        connection = sqlite3.connect('database.db')
-        cursor = connection.cursor()
-        cursor.execute("INSERT INTO authors (id, name) VALUES (?, ?)", (self._id, self._name))
-        connection.commit()
-        connection.close()
 
     @property
     def id(self):
@@ -22,23 +18,19 @@ class Author:
     def name(self):
         return self._name
 
+    @name.setter
+    def name(self, value):
+        raise AttributeError("Cannot change name after initialization.")
+
     def articles(self):
-        connection = sqlite3.connect('database.db')
-        cursor = connection.cursor()
-        cursor.execute("SELECT * FROM articles WHERE author_id = ?", (self.id,))
-        articles = cursor.fetchall()
-        connection.close()
-        return articles
+        query = "SELECT * FROM articles WHERE author_id = ?;"
+        return Connection.get_db_connection().execute(query, (self.id,)).fetchall()
 
     def magazines(self):
-        connection = sqlite3.connect('database.db')
-        cursor = connection.cursor()
-        cursor.execute("""
-            SELECT DISTINCT m.id, m.name, m.category
+        query = """
+            SELECT DISTINCT m.* 
             FROM magazines m
             JOIN articles a ON a.magazine_id = m.id
-            WHERE a.author_id = ?
-        """, (self.id,))
-        magazines = cursor.fetchall()
-        connection.close()
-        return magazines
+            WHERE a.author_id = ?;
+        """
+        return Connection.get_db_connection().execute(query, (self.id,)).fetchall()
